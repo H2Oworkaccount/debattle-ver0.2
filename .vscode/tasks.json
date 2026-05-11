@@ -1,0 +1,17 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Get Git Log",
+            "type": "shell",
+            "command": "git log --oneline -10",
+            "group": "build"
+        },
+        {
+            "label": "Fix Git Secret",
+            "type": "shell",
+            "command": "git reset --hard HEAD~1 && git rm --cached debattle-ver0.1-main/.env && git add . && git commit -m \"Remove .env from tracking, add .gitignore, and update .env\"",
+            "group": "build"
+        }
+    ]
+}
