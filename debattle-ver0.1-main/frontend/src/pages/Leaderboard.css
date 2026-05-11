@@ -1,0 +1,68 @@
+.leaderboard {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 40px 20px;
+}
+
+.leaderboard h1 {
+  text-align: center;
+  color: white;
+  font-size: 2.2rem;
+  margin-bottom: 40px;
+}
+
+.leaderboard-table {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  border-collapse: collapse;
+}
+
+.leaderboard-table thead {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.leaderboard-table th {
+  padding: 18px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.leaderboard-table td {
+  padding: 15px 18px;
+  border-bottom: 1px solid #eee;
+}
+
+.leaderboard-table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.leaderboard-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.leaderboard-table tr.top-ranked {
+  background-color: #fff9e6;
+  font-weight: 600;
+}
+
+.leaderboard-table tr.top-ranked td:first-child {
+  font-size: 1.2rem;
+}
+
+@media (max-width: 768px) {
+  .leaderboard h1 {
+    font-size: 1.8rem;
+  }
+
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 12px;
+    font-size: 0.9rem;
+  }
+}

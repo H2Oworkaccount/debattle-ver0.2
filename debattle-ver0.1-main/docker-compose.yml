@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: debattle_db
+    environment:
+      POSTGRES_USER: debattle_user
+      POSTGRES_PASSWORD: debattle_password
+      POSTGRES_DB: debattle
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - debattle-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U debattle_user -d debattle"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: debattle_backend
+    environment:
+      PORT: 4000
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: debattle
+      DB_USER: debattle_user
+      DB_PASSWORD: debattle_password
+      JWT_SECRET: your_jwt_secret_change_in_production
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      FRONTEND_URL: https://${CODESPACE_NAME}-3000.app.github.dev
+      TTS_ENABLED: true
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+    networks:
+      - debattle-network
+
+  frontend:
+    build: ./frontend
+    container_name: debattle_frontend
+    environment:
+      REACT_APP_SERVER_URL: https://${CODESPACE_NAME}-4000.app.github.dev/
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/src:/app/src
+    networks:
+      - debattle-network
+
+volumes:
+  postgres_data:
+
+networks:
+  debattle-network:
+    driver: bridge
