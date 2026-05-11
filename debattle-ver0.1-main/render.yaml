@@ -1,0 +1,36 @@
+services:
+  - type: web_service
+    name: debattle-backend
+    env: docker
+    branch: main
+    dockerfilePath: backend/Dockerfile
+    plan: starter
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: JWT_SECRET
+        value: your_jwt_secret_here
+      - key: GROQ_API_KEY
+        value: your_groq_api_key_here
+      - key: FRONTEND_URL
+        value: https://your-frontend-domain
+      - key: TTS_ENABLED
+        value: true
+
+  - type: static_site
+    name: debattle-frontend
+    env: static
+    branch: main
+    root: frontend
+    buildCommand: npm install && npm run build
+    publishPath: build
+    envVars:
+      - key: REACT_APP_SERVER_URL
+        value: https://your-backend-domain
+
+databases:
+  - name: debattle-db
+    plan: starter
+    databaseName: debattle

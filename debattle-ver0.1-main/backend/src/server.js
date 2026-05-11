@@ -45,11 +45,13 @@ app.use(express.json());
 
 // Initialize database pool
 const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || undefined,
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
 });
 
 // Export pool for use in routes
@@ -104,6 +106,7 @@ const debateTimers = new Map(); // roomId -> timer info
 
 // Debate timing constants (in seconds)
 const DEBATE_PHASES = {
+  WAITING: 10,       // Wait for both players to be ready
   INITIAL_1: 30,      // Player 1 initial argument
   INITIAL_2: 30,      // Player 2 initial argument
   INTERMISSION: 25,   // AI analysis + display initial scores
@@ -120,9 +123,10 @@ io.on('connection', (socket) => {
     
     console.log(`${username} (${userId}) joined queue`);
     
-    // Store user info
+    // Store user info and socket reference
     activeUsers.set(userId, {
       socketId: socket.id,
+      socket: socket,
       username,
       userId,
     });
@@ -164,6 +168,8 @@ io.on('connection', (socket) => {
           conScore: null,
           spectators: [],
           spectatorCode: null,
+          proReady: false,
+          conReady: false,
         });
 
         // Notify both users
@@ -180,6 +186,12 @@ io.on('connection', (socket) => {
           opponent: proUser.username,
           topic: topic.topic_text,
         });
+
+        // Have both players join the debate room so they receive room-wide broadcasts
+        const proSocket = activeUsers.get(proUser.userId)?.socket;
+        const conSocket = activeUsers.get(conUser.userId)?.socket;
+        if (proSocket) proSocket.join(roomId);
+        if (conSocket) conSocket.join(roomId);
 
         console.log(`Created debate room ${roomId}: ${proUser.username} (pro) vs ${conUser.username} (con)`);
       } catch (err) {
@@ -264,14 +276,41 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Start debate - begin timing
-  socket.on('start_debate', (data) => {
-    const { roomId } = data;
+  // Player ready - wait for both players before starting countdown
+  socket.on('player_ready', (data) => {
+    const { roomId, userId } = data;
     const room = activeRooms.get(roomId);
 
     if (!room) return;
 
-    startDebatePhases(roomId, room);
+    // Mark player as ready
+    if (room.proUserId === userId) {
+      room.proReady = true;
+    } else if (room.conUserId === userId) {
+      room.conReady = true;
+    }
+
+    // If both players are ready, start the debate phases
+    if (room.proReady && room.conReady) {
+      startDebatePhases(roomId, room);
+    }
+  });
+
+  // Relay WebRTC signaling data between players
+  socket.on('peer_signal', (data) => {
+    const { roomId, userId, signal } = data;
+    const room = activeRooms.get(roomId);
+    if (!room) return;
+
+    const otherUserId = room.proUserId === userId ? room.conUserId : room.proUserId;
+    const otherSocketId = activeUsers.get(otherUserId)?.socketId;
+
+    if (otherSocketId) {
+      io.to(otherSocketId).emit('peer_signal', {
+        userId,
+        signal,
+      });
+    }
   });
 
   // Submit argument during debate
@@ -279,10 +318,32 @@ io.on('connection', (socket) => {
     const { roomId, text, userId, side } = data;
     const room = activeRooms.get(roomId);
 
+    console.log('Received debate_input:', {
+      roomId,
+      userId,
+      side,
+      text,
+      currentPhase: room?.currentPhase,
+    });
+
     if (!room) return;
 
-    const isProTurn = side === 'pro' && (room.currentPhase === 'INITIAL_1' || room.currentPhase === 'FINAL_1');
-    const isConTurn = side === 'con' && (room.currentPhase === 'INITIAL_2' || room.currentPhase === 'FINAL_2');
+    let isProTurn = side === 'pro' && (room.currentPhase === 'INITIAL_1' || room.currentPhase === 'FINAL_1');
+    let isConTurn = side === 'con' && (room.currentPhase === 'INITIAL_2' || room.currentPhase === 'FINAL_2');
+
+    // Allow buffered speech submitted immediately after the phase boundary
+    if (!isProTurn && side === 'pro' && room.currentPhase === 'INITIAL_2' && room.proCues.length === 0) {
+      isProTurn = true;
+      console.log('Accepting late pro argument for INITIAL_1 by phase boundary flush');
+    }
+    if (!isConTurn && side === 'con' && room.currentPhase === 'INTERMISSION' && room.conCues.length === 0) {
+      isConTurn = true;
+      console.log('Accepting late con argument for INITIAL_2 by phase boundary flush');
+    }
+    if (!isProTurn && side === 'pro' && room.currentPhase === 'FINAL_2' && room.proIntermissionCues.length === 0) {
+      isProTurn = true;
+      console.log('Accepting late pro argument for FINAL_1 by phase boundary flush');
+    }
 
     if (!isProTurn && !isConTurn) {
       socket.emit('error', { message: 'Not your turn to speak' });
@@ -345,7 +406,7 @@ io.on('connection', (socket) => {
 
 // Debate phase management
 function startDebatePhases(roomId, room) {
-  const phases = ['INITIAL_1', 'INITIAL_2', 'INTERMISSION', 'FINAL_1', 'FINAL_2'];
+  const phases = ['WAITING', 'INITIAL_1', 'INITIAL_2', 'INTERMISSION', 'FINAL_1', 'FINAL_2'];
 
   const runPhase = async (phaseIndex) => {
     if (!room || phaseIndex >= phases.length) {

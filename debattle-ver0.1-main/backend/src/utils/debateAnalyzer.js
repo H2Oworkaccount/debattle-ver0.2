@@ -13,6 +13,8 @@ const analyzeDebate = async (topic, proCues, conCues) => {
 
 Topic: "${topic}"
 
+NOTE: These arguments were transcribed from spoken audio and may contain filler words, repetitions, or imperfect grammar. Normalize the arguments into clear written form, and judge the intended meaning of each speaker rather than penalizing transcription noise.
+
 PRO ARGUMENTS:
 ${proArguments || '(No arguments provided)'}
 

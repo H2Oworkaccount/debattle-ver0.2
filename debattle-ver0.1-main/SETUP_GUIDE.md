@@ -222,6 +222,29 @@ npm install
 npm start
 ```
 
+## Deploying to Render
+
+This repository includes a `render.yaml` manifest for Render.com.
+
+1. Connect the GitHub repo to Render.
+2. Create the `debattle-backend` web service using Docker.
+3. Create the `debattle-frontend` static site using the `frontend` folder.
+4. Create a Render Postgres database named `debattle-db`.
+5. Set these env vars on the backend service:
+   - `JWT_SECRET`
+   - `GROQ_API_KEY`
+   - `FRONTEND_URL` (your public frontend URL)
+   - `TTS_ENABLED=true`
+6. Set `REACT_APP_SERVER_URL` on the frontend service to your backend URL.
+
+Render will build the frontend and run the backend from `backend/Dockerfile`.
+
+## Architecture Overview
+
+# Start frontend
+npm start
+```
+
 ## Architecture Overview
 
 ### Backend
